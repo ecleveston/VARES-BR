@@ -43,6 +43,9 @@ Implementação do VAR e do ES para todas as colunas
 for (coluna in nomes_colunas){
   #Retornos
   retornos <- data[[coluna]]
+
+  #análise descritiva
+  source("analise_descritiva.R")
   
   #VAR paramétrico normal
   desvio_padrao <- sd(retornos, na.rm = TRUE)
