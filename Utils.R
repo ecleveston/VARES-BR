@@ -61,6 +61,40 @@ figarch_fit <- function(spec, data) {
   return(fit_model)
 }
 
+msgarch_fit <- function(spec, data) {
+  is_error <- TRUE
+  k <- 0
+  opt_methods <- c("BFGS", "Nelder-Mead", "CG", "SANN", "solnp")
+  expr <- NULL
+  while (is_error == TRUE && k < 6) {
+    k <- k + 1
+    expr <- tryCatch({
+      if (k < 5) {
+        fit_model <- FitML(spec, data, ctr = list(do.se = FALSE, do.plm = FALSE, OptimFUN = function(vPw, f_nll, spec, data, do.plm){
+          out <- stats::optim(vPw, f_nll, spec = spec, data = data, do.plm = do.plm, method = opt_methods[k])}))
+      } else {
+        fit_model <- FitML(spec, data, ctr = list(do.se = FALSE, do.plm = TRUE, OptimFUN = function(vPw, f_nll, spec, data, do.plm) {
+          fn_obj <- function(pars) {
+            val <- f_nll(pars, spec = spec, data = data, do.plm = do.plm)
+            return(sum(val))
+          }
+          out <- Rsolnp::solnp(pars = vPw, fun = fn_obj)
+          out$value <- out$values[length(out$values)]
+          out$convergence <- ifelse(out$convergence == 0, 0, 1)
+          return(out)
+        }))
+      }
+      TRUE
+    }, error = function(e) {
+      FALSE
+    }, warning = function(cond) {
+      FALSE
+    })
+    if (isTRUE(expr)) is_error <- FALSE
+  }
+  return(fit_model)
+}
+
 ###############################
 ###         Methods         ###
 ###############################
@@ -75,14 +109,14 @@ variance_covariance <- function(r, alpha, distri = c("Normal", "Student-t")) {
   distri <- match.arg(distri)
   if (distri == "Normal") {
     n <- length(r)
-    s <- sd(r) * sqrt((n - 1) / n)
+    sigma <- sd(r) * sqrt((n - 1) / n)
     q <- qnorm(alpha)
-    var <- s * q
-    es <- -s * dnorm(q) / alpha
+    var <- sigma * q
+    es <- -sigma * dnorm(q) / alpha
   } else {
-    fit_student <- MASS::fitdistr(r, densfun = dt_c, start = list(df = 5, scale = sd(r_c)), lower = c(df = 2.01, scale = 1e-8)) 
+    fit_student <- MASS::fitdistr(r, densfun = dt_c, start = list(df = 5, scale = sd(r)), lower = c(df = 2.01, scale = 1e-8)) 
     nu <- fit_student$estimate["df"]
-    s  <- fit_student$estimate["scale"]
+    s  <- fit_student$estimate["scale"] # equiv sigma/{sqrt(nu/(nu -2))}
     q <- qt(alpha, df = nu)
     var <- s * q
     es <- - s * dt(q, df = nu) * (nu + q^2) / ((nu - 1) * alpha)
@@ -110,6 +144,8 @@ evt_pot <- function(r, alpha, theta = 0.85){
   out <- c(-var, -es)
 }
 
+
+
 fhs <- function(e, sigma_fore, B, alpha) {
   eb <- sample(e, B, replace = TRUE)
   var_e <- quantile(eb, prob = alpha)
@@ -119,17 +155,17 @@ fhs <- function(e, sigma_fore, B, alpha) {
   out <- c(var, es)
 }
 
-parametric_var_es <- function(sigma, alpha, distri = c("Normal", "Student-t"), ...){
+parametric_var_es <- function(sigma, alpha, distri = c("Normal", "Student-t"), nu = NULL){
   distri <- match.arg(distri)
   if (distri == "Normal") {
     q <- qnorm(alpha)
     var <- sigma * q
     es <- -sigma * dnorm(q) / alpha
   } else {
-    k <- sqrt((nu - 2) / nu)
+    k <- sqrt(nu / (nu - 2))
     q <- qt(alpha, df = nu)
-    var <- sigma * k * q
-    es <- - sigma * k * dt(q, df = nu) * (nu + q^2) / ((nu - 1) * alpha) 
+    var <- sigma / k * q
+    es <- - sigma / k * dt(q, df = nu) * (nu + q^2) / ((nu - 1) * alpha) 
   }
   out <- c(var, es)
 }

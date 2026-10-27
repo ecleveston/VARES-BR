@@ -15,11 +15,11 @@ sourceCpp("CAViaR.cpp")
 source("Utils.R")
 
 # Import Data
-data <- read_excel("economatica.xlsx", skip = 3, col_types = c("date", rep("numeric", 512)), na = c("", "-", NA)) |> 
-  filter(Data > "2010-01-01" & Data < "2025-01-01") |> 
+data <- read_excel("precos_b3.xlsx", skip = 3, col_types = c("date", rep("numeric", 475)), na = c("", "-", NA)) |> 
+  filter(Data > "2010-01-01" & Data < "2026-10-01") |> 
   filter(!if_all(where(is.numeric), is.na)) |> 
   select_if(~ !any(is.na(.))) |> 
-  rename_with(~ str_remove(.x, "^(?s).*prov\n"), -Data)
+  rename_with(~ str_remove(.x, "^(?s).*orig\n"), -Data)
 names_stocks <- colnames(data)[-1]
 ## Baixar dados de preço diário e nós mesmos passar pra log-retorno
 
@@ -27,7 +27,7 @@ names_stocks <- colnames(data)[-1]
 alpha1 <- 0.010
 alpha2 <- 0.025
 alpha3 <- 0.050
-in_sample <- 1500
+in_sample <- 2500
 B <- 3 * in_sample
 
 garch_spec_n <- ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1, 1)), mean.model = list(armaOrder = c(0, 0), include.mean = FALSE), distribution.model = "norm")
@@ -62,6 +62,7 @@ for (stock in names_stocks){
   var_matrix <- matrix(0, nrow = n_oos, ncol = length(names) + 1, dimnames = list(NULL, c("returns", names)))
   es_matrix <- matrix(0, nrow = n_oos, ncol = length(names), dimnames = list(NULL,  names))
   for (i in 1:n_oos){
+    print(i)
     set.seed(123 + i)
     r <- ret[i:(i + in_sample - 1)]
     mu <- mean(r)
