@@ -19,8 +19,23 @@ data <- read_excel("precos_b3.xlsx", skip = 3, col_types = c("date", rep("numeri
   filter(Data > "2010-01-01" & Data < "2026-10-01") |> 
   filter(!if_all(where(is.numeric), is.na)) |> 
   select_if(~ !any(is.na(.))) |> 
-  rename_with(~ str_remove(.x, "^(?s).*orig\n"), -Data)
+  rename_with(~ str_remove(.x, "^(?s).*orig\n"), -Data) |> 
+  mutate(across(where(is.numeric), ~ (log(.x) - lag(log(.x))) * 100)) |> 
+  slice(-1)
 names_stocks <- colnames(data)[-1]
+
+
+data <- read_excel("precos_b3.xlsx", skip = 3, col_types = c("date", rep("numeric", 475)), na = c("", "-", NA))  |> 
+  rename_with(~ str_remove(.x, "PU\najust p/ prov\nEm moeda orig\n")) |> 
+  mutate(Data = as.Date(Data)) |>
+  filter(Data > as.Date("2009-12-29") & Data < as.Date("2026-08-01")) |> 
+  filter(!if_all(where(is.numeric), is.na)) |> 
+  select(where(~ !any(is.na(.x)))) |> 
+  mutate(across(where(is.numeric), ~ (log(.x) - lag(log(.x))) * 100)) |> 
+  slice(-1)
+
+
+
 ## Baixar dados de preço diário e nós mesmos passar pra log-retorno
 
 # Setup
